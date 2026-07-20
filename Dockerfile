@@ -1,4 +1,4 @@
-# Stage 1: Build frontend assets (Vite + Tailwind + Fonts)
+# Stage 1: Build frontend assets
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -6,38 +6,36 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 2: PHP runtime with mysqlnd (supports caching_sha2_password)
+# Stage 2: PHP runtime
 FROM php:8.4-fpm-alpine
 
-# Install system dependencies + nginx
-RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    curl \
+# Install deps
+RUN apk add --no-cache nginx supervisor curl \
     && docker-php-ext-install pdo_mysql
 
-# Install Composer
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy application
+# App
 WORKDIR /app
 COPY . .
 
-# Copy pre-built frontend assets from build stage
+# Build assets from stage 1
 COPY --from=build /app/public/build /app/public/build
 
-# Install PHP dependencies (production only)
+# Prod deps
 RUN composer install --no-dev --no-interaction --no-progress
 
-# Storage permissions (PHP-FPM runs as www-data)
+# Permissions
 RUN chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Remove build-only files
+# Cleanup
 RUN rm -rf node_modules .env package.json package-lock.json vite.config.js
 
-# Configure Nginx
-RUN echo 'server {
+# Nginx config
+RUN cat > /etc/nginx/http.d/default.conf <<'NGINX'
+server {
     listen 80;
     root /app/public;
     index index.php;
@@ -61,10 +59,11 @@ RUN echo 'server {
     location ~ /\.(?!well-known).* {
         deny all;
     }
-}' > /etc/nginx/http.d/default.conf
+NGINX
 
-# Configure Supervisor (runs both PHP-FPM and Nginx)
-RUN echo '[supervisord]
+# Supervisor config
+RUN cat > /etc/supervisord.conf <<'SUPERVISOR'
+[supervisord]
 nodaemon=true
 user=root
 logfile=/dev/null
@@ -87,7 +86,7 @@ stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
-' > /etc/supervisord.conf
+SUPERVISOR
 
 EXPOSE 80
 
