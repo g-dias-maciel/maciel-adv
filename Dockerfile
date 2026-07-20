@@ -13,6 +13,9 @@ FROM php:8.4-fpm-alpine
 RUN apk add --no-cache nginx supervisor curl \
     && docker-php-ext-install pdo_mysql
 
+# PHP-FPM: allow env vars to reach workers (critical for Laravel)
+RUN sed -i 's/^clear_env = yes/clear_env = no/' /usr/local/etc/php-fpm.d/www.conf
+
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -34,7 +37,23 @@ RUN chmod -R 775 storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Cleanup
-RUN rm -rf node_modules .env package.json package-lock.json vite.config.js
+RUN rm -rf node_modules package.json package-lock.json vite.config.js
+
+# Entrypoint: generate .env from runtime environment variables
+RUN cat > /entrypoint.sh <<'ENTRYPOINT'
+#!/bin/sh
+# Generate .env from runtime environment variables for Laravel
+: > /app/.env
+env | while IFS='=' read -r key value; do
+    case "$key" in
+        APP_*|DB_*|SESSION_*|BROADCAST_*|FILESYSTEM_*|QUEUE_*|CACHE_*|MAIL_*|LOG_*|BCRYPT_*)
+            printf '%s="%s"\n' "$key" "$value" >> /app/.env
+            ;;
+    esac
+done
+exec "$@"
+ENTRYPOINT
+RUN chmod +x /entrypoint.sh
 
 # Nginx config
 RUN cat > /etc/nginx/http.d/default.conf <<'NGINX'
@@ -62,6 +81,7 @@ server {
     location ~ /\.(?!well-known).* {
         deny all;
     }
+}
 NGINX
 
 # Supervisor config
@@ -93,4 +113,5 @@ SUPERVISOR
 
 EXPOSE 80
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]
