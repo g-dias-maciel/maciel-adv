@@ -23,6 +23,9 @@ COPY . .
 # Build assets from stage 1
 COPY --from=build /app/public/build /app/public/build
 
+# Create Laravel cache directories (required for artisan commands)
+RUN mkdir -p bootstrap/cache storage/framework/cache/data storage/framework/sessions storage/framework/views
+
 # Prod deps
 RUN composer install --no-dev --no-interaction --no-progress
 
