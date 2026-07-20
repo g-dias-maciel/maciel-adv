@@ -46,7 +46,7 @@ RUN cat > /entrypoint.sh <<'ENTRYPOINT'
 : > /app/.env
 env | while IFS='=' read -r key value; do
     case "$key" in
-        APP_*|DB_*|SESSION_*|BROADCAST_*|FILESYSTEM_*|QUEUE_*|CACHE_*|MAIL_*|LOG_*|BCRYPT_*)
+        APP_*|ASSET_URL|DB_*|SESSION_*|BROADCAST_*|FILESYSTEM_*|QUEUE_*|CACHE_*|MAIL_*|LOG_*|BCRYPT_*)
             printf '%s="%s"\n' "$key" "$value" >> /app/.env
             ;;
     esac
