@@ -1,0 +1,2 @@
+[start]
+cmd = "bash /app/deploy/start.sh"
