@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Fix storage permissions for Laravel
+chmod -R 777 /app/storage /app/bootstrap/cache
+
 # Run default prestart (generates /nginx.conf from Nixpacks template)
 node /assets/scripts/prestart.mjs /assets/nginx.template.conf /nginx.conf
 
